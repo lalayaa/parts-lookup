@@ -415,26 +415,28 @@
 <script>
 const API = 'https://script.google.com/macros/s/AKfycbzx9vWK1L83z8eHGFzMwzwrX76zXWp8oe20iOaw71kpIHmqpCoxs46gCqAcsp0DU0SX/exec';
 
-// 呼叫 Apps Script API（JSONP，手機電腦通用）
+// 呼叫 Apps Script API（fetch + no-redirect）
 function callAPI(params, callback) {
-  const cbName = 'apicb_' + Math.random().toString(36).slice(2);
-  const el = document.createElement('script');
   const qs = Object.entries(params)
     .map(([k,v]) => encodeURIComponent(k)+'='+encodeURIComponent(v))
     .join('&');
-  let settled = false;
-  const done = function(d) {
-    if (settled) return; settled = true;
-    clearTimeout(t);
-    try { delete window[cbName]; } catch(e) {}
-    try { if (el.parentNode) el.parentNode.removeChild(el); } catch(e) {}
-    callback(d);
-  };
-  window[cbName] = done;
-  const t = setTimeout(function(){ done({status:'error',message:'timeout'}); }, 15000);
-  el.onerror = function(){ done({status:'error',message:'load error'}); };
-  el.src = API + '?' + qs + '&callback=' + cbName;
-  document.head.appendChild(el);
+  const url = API + '?' + qs;
+  fetch(url, {
+    method: 'GET',
+    redirect: 'follow',
+  })
+  .then(function(r) { return r.text(); })
+  .then(function(text) {
+    try {
+      // 有時回傳 JSONP 包裝，有時是純 JSON
+      const json = text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, '');
+      callback(JSON.parse(json));
+    } catch(e) {
+      try { callback(JSON.parse(text)); }
+      catch(e2) { callback({status:'error',message:'parse error'}); }
+    }
+  })
+  .catch(function() { callback({status:'error',message:'fetch failed'}); });
 }
 
 // 初始化：取得統計資料
