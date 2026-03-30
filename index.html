@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>料號查詢系統</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #F7F6F3;
+    --surface: #FFFFFF;
+    --border: #E8E4DC;
+    --border-strong: #C8C2B4;
+    --text: #1A1814;
+    --text-muted: #7A7468;
+    --text-hint: #B0A898;
+    --accent: #2B5CE6;
+    --accent-light: #EEF2FD;
+    --accent-dim: #8BA4F0;
+    --warn: #D97706;
+    --warn-light: #FEF3C7;
+    --success: #059669;
+    --success-light: #ECFDF5;
+    --danger: #DC2626;
+    --orange: #EA580C;
+    --orange-light: #FFF7ED;
+    --yellow-light: #FEFCE8;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--text);
+    color: white;
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-title {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+  .header-sub {
+    font-size: 12px;
+    opacity: 0.5;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 2px;
+  }
+  .header-stats {
+    display: flex;
+    gap: 20px;
+    font-size: 12px;
+    opacity: 0.7;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .header-stats span { opacity: 1; font-weight: 500; color: #90B4FF; }
+
+  /* ── Main layout ── */
+  .main { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+
+  /* ── Search panel ── */
+  .search-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .search-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end; }
+  .field { flex: 1; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  input[type="text"], select {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="text"]:focus, select:focus { border-color: var(--accent); background: white; }
+  select { width: 160px; cursor: pointer; }
+
+  .btn {
+    padding: 9px 20px;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #1E4AD4; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--bg); }
+
+  .search-hint {
+    font-size: 11px;
+    color: var(--text-hint);
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* 篩選標籤 */
+  .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; min-height: 0; }
+  .tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; padding: 3px 9px;
+    border-radius: 20px;
+    background: var(--accent-light); color: var(--accent);
+    border: 1px solid var(--accent-dim);
+  }
+  .tag-x { cursor: pointer; font-size: 15px; line-height: 1; opacity: 0.7; }
+  .tag-x:hover { opacity: 1; }
+
+  /* ── Results ── */
+  .result-meta {
+    font-size: 12px; color: var(--text-muted);
+    margin-bottom: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .result-meta strong { color: var(--text); }
+
+  /* 卡片 */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 18px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid var(--border);
+  }
+  .card.multi .card-header { background: var(--orange-light); border-bottom-color: #FDDCB5; }
+  .ml-pn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px; font-weight: 500;
+    color: var(--text);
+  }
+  .pname { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  .badge {
+    font-size: 11px; padding: 3px 9px;
+    border-radius: 20px; white-space: nowrap;
+    font-weight: 500;
+  }
+  .badge-blue { background: var(--accent-light); color: var(--accent); }
+  .badge-orange { background: var(--orange-light); color: var(--orange); border: 1px solid #FDDCB5; }
+
+  /* 表格 */
+  .ctable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ctable th {
+    text-align: left; padding: 8px 12px;
+    font-size: 11px; font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .ctable td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .ctable tr:last-child td { border-bottom: none; }
+  .ctable tr:hover td { background: var(--bg); }
+
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .empty { color: var(--text-hint); font-style: italic; }
+  .hl { background: #FEF08A; border-radius: 3px; padding: 0 2px; }
+
+  .price { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  .missing-cell { background: var(--yellow-light); }
+
+  /* 找不到 */
+  .no-result {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 48px 24px;
+    text-align: center;
+  }
+  .no-result-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.3; }
+  .no-result-title { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+  .no-result-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+
+  /* 初始狀態 */
+  .empty-state {
+    text-align: center; padding: 60px 24px;
+    color: var(--text-muted);
+  }
+  .empty-state-title { font-size: 15px; font-weight: 500; margin-bottom: 8px; color: var(--text); }
+  .empty-state-sub { font-size: 13px; }
+
+  /* Loading */
+  .loading {
+    text-align: center; padding: 40px;
+    color: var(--text-muted); font-size: 13px;
+  }
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 200;
+    align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 24px;
+    width: 100%; max-width: 480px;
+    border: 1px solid var(--border);
+  }
+  .modal-title { font-size: 16px; font-weight: 500; margin-bottom: 18px; }
+  .mfield { margin-bottom: 12px; }
+  .mfield label { display: block; font-size: 11px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+  .mfield input, .mfield select { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 14px; background: var(--bg); color: var(--text); outline: none; }
+  .mfield input:focus, .mfield select:focus { border-color: var(--accent); background: white; }
+  .mfield-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 18px; }
+  .modal-btns .btn { flex: 1; padding: 10px; }
+  .required { color: var(--danger); }
+
+  /* 成功提示 */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--text); color: white;
+    padding: 12px 18px; border-radius: var(--radius-sm);
+    font-size: 13px; z-index: 300;
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.3s;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  @media (max-width: 600px) {
+    .search-row { flex-direction: column; }
+    .header-stats { display: none; }
+    .ctable { font-size: 12px; }
+    .ctable th, .ctable td { padding: 6px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">料號查詢系統</div>
+    <div class="header-sub">明利科技</div>
+  </div>
+  <div class="header-stats">
+    公司料號 <span id="h-ml">—</span> &nbsp;|&nbsp;
+    總筆數 <span id="h-rec">—</span> &nbsp;|&nbsp;
+    有廠商 <span id="h-vendor">—</span>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- 搜尋面板 -->
+  <div class="search-panel">
+    <div class="search-row">
+      <div class="field">
+        <label>搜尋</label>
+        <input type="text" id="q1" placeholder="料號、品名、客戶名稱…">
+      </div>
+      <div class="field" style="flex: 0 0 auto;">
+        <label>範圍</label>
+        <select id="scope">
+          <option value="all">全部欄位</option>
+          <option value="ml">公司料號</option>
+          <option value="cust_pn">客戶料號</option>
+          <option value="name">品名</option>
+          <option value="cust_name">客戶名稱</option>
+        </select>
+      </div>
+    </div>
+    <div class="search-row">
+      <div class="field">
+        <label>再篩選 <span style="font-weight:300;text-transform:none;letter-spacing:0">（空格隔開多個關鍵字，全部符合才顯示）</span></label>
+        <input type="text" id="q2" placeholder="例：M5 16  →  同時含 M5 和 16">
+      </div>
+      <button class="btn btn-primary" onclick="doSearch()">搜尋</button>
+      <button class="btn btn-ghost" onclick="clearSearch()">清除</button>
+    </div>
+    <div class="search-hint">M5*8 = M5x8 = M5X8（* x X 視為相同）・大小寫不分</div>
+    <div class="tag-row" id="tag-row"></div>
+  </div>
+
+  <!-- 結果區 -->
+  <div id="result-area">
+    <div class="empty-state">
+      <div class="empty-state-title">輸入關鍵字開始搜尋</div>
+      <div class="empty-state-sub">可搜尋公司料號、客戶料號、品名或客戶名稱</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 16px; text-align: right;">
+    <button class="btn btn-ghost" onclick="openAdd()">＋ 新增料號</button>
+  </div>
+
+</div>
+
+<!-- 新增Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title">新增料號</div>
+    <div class="mfield">
+      <label>公司料號 (ML) <span class="required">*</span></label>
+      <input id="f-ml" placeholder="例：ML-A001">
+    </div>
+    <div class="mfield">
+      <label>品名規格 <span class="required">*</span></label>
+      <input id="f-name" placeholder="例：圓頭內六角螺絲 M5*16 SUS304">
+    </div>
+    <div class="mfield-row">
+      <div class="mfield">
+        <label>客戶代碼</label>
+        <input id="f-cc" placeholder="例：A0001">
+      </div>
+      <div class="mfield">
+        <label>客戶名稱</label>
+        <input id="f-cn" placeholder="例：台積電">
+      </div>
+    </div>
+    <div class="mfield">
+      <label>客戶料號</label>
+      <input id="f-cpn" placeholder="例：S0.00127.AFY">
+    </div>
+    <div class="mfield-row">
+      <div class="mfield">
+        <label>賣價（稅前）</label>
+        <input id="f-price" type="number" placeholder="0">
+      </div>
+      <div class="mfield">
+        <label>是否比價</label>
+        <select id="f-cmp">
+          <option value="否">否（固定廠商）</option>
+          <option value="是">是（需重新詢價）</option>
+        </select>
+      </div>
+    </div>
+    <div class="mfield-row">
+      <div class="mfield">
+        <label>廠商</label>
+        <input id="f-vendor" placeholder="廠商名稱">
+      </div>
+      <div class="mfield">
+        <label>成本單價</label>
+        <input id="f-cost" type="number" placeholder="0">
+      </div>
+    </div>
+    <div class="mfield">
+      <label>備註</label>
+      <input id="f-note" placeholder="選填">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveRecord()">儲存到 Google Sheets</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbzx9vWK1L83z8eHGFzMwzwrX76zXWp8oe20iOaw71kpIHmqpCoxs46gCqAcsp0DU0SX/exec';
+
+// 呼叫 Apps Script API（JSONP，手機電腦通用）
+function callAPI(params, callback) {
+  const cbName = 'apicb_' + Math.random().toString(36).slice(2);
+  const el = document.createElement('script');
+  const qs = Object.entries(params)
+    .map(([k,v]) => encodeURIComponent(k)+'='+encodeURIComponent(v))
+    .join('&');
+  let settled = false;
+  const done = function(d) {
+    if (settled) return; settled = true;
+    clearTimeout(t);
+    try { delete window[cbName]; } catch(e) {}
+    try { if (el.parentNode) el.parentNode.removeChild(el); } catch(e) {}
+    callback(d);
+  };
+  window[cbName] = done;
+  const t = setTimeout(function(){ done({status:'error',message:'timeout'}); }, 15000);
+  el.onerror = function(){ done({status:'error',message:'load error'}); };
+  el.src = API + '?' + qs + '&callback=' + cbName;
+  document.head.appendChild(el);
+}
+
+// 初始化：取得統計資料
+callAPI({action: 'init'}, function(d) {
+  if (d && d.status === 'ok') {
+    document.getElementById('h-rec').textContent = (d.rows || 0).toLocaleString();
+  }
+});
+
+function normalize(s) {
+  return String(s).toLowerCase().replace(/[xX*×]/g, '@').replace(/\s+/g, ' ').trim();
+}
+
+function highlight(text, terms) {
+  let t = String(text);
+  terms.forEach(kw => {
+    if (!kw) return;
+    const escaped = kw.replace(/[@]/g, '[xX*×@]').replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+    try {
+      t = t.replace(new RegExp(escaped, 'gi'), m => `<span class="hl">${m}</span>`);
+    } catch(e) {}
+  });
+  return t;
+}
+
+function doSearch() {
+  const q1 = document.getElementById('q1').value.trim();
+  const q2 = document.getElementById('q2').value.trim();
+  const scope = document.getElementById('scope').value;
+  const area = document.getElementById('result-area');
+
+  if (!q1 && !q2) {
+    area.innerHTML = '<div class="empty-state"><div class="empty-state-title">請輸入搜尋關鍵字</div></div>';
+    return;
+  }
+
+  // 顯示篩選標籤
+  const tagRow = document.getElementById('tag-row');
+  tagRow.innerHTML = '';
+  if (q1) tagRow.innerHTML += `<span class="tag">搜尋：${q1} <span class="tag-x" onclick="clearQ('q1')">×</span></span>`;
+  q2.split(/\s+/).filter(Boolean).forEach(t => {
+    tagRow.innerHTML += `<span class="tag">篩選：${t}</span>`;
+  });
+
+  area.innerHTML = '<div class="loading"><div class="spinner"></div>搜尋中…</div>';
+
+  callAPI({ action: 'search', q1, q2, scope }, function(d) {
+    if (!d || d.status === 'error') {
+      area.innerHTML = '<div class="no-result"><div class="no-result-title">連線失敗</div><div class="no-result-sub">請重新整理頁面再試</div></div>';
+      return;
+    }
+    renderResults(d, q1, q2);
+  });
+}
+
+function renderResults(d, q1, q2) {
+  const area = document.getElementById('result-area');
+  if (!d.results || !d.results.length) {
+    area.innerHTML = `
+      <div class="no-result">
+        <div class="no-result-icon">○</div>
+        <div class="no-result-title">找不到「${q1}」</div>
+        <div class="no-result-sub">這個料號尚未建檔，或試試換個關鍵字</div>
+        <button class="btn btn-primary" onclick="openAdd('${q1}')">＋ 新增這個料號</button>
+      </div>`;
+    return;
+  }
+
+  // 以公司料號分組
+  const byML = {};
+  d.results.forEach(r => {
+    if (!byML[r.ml_pn]) byML[r.ml_pn] = [];
+    byML[r.ml_pn].push(r);
+  });
+
+  const allTerms = [normalize(q1), ...q2.split(/\s+/).map(normalize)].filter(Boolean);
+  let html = `<div class="result-meta">找到 <strong>${d.total}</strong> 筆，共 <strong>${Object.keys(byML).length}</strong> 個公司料號</div>`;
+
+  for (const [ml, entries] of Object.entries(byML)) {
+    const isMulti = entries.length > 1;
+    html += `
+      <div class="card ${isMulti ? 'multi' : ''}">
+        <div class="card-header">
+          <div>
+            <div class="ml-pn">${highlight(ml, allTerms)}</div>
+            <div class="pname">${highlight(entries[0].name, allTerms)}</div>
+          </div>
+          ${isMulti
+            ? `<span class="badge badge-orange">${entries.length} 個客戶</span>`
+            : `<span class="badge badge-blue">單一客戶</span>`}
+        </div>
+        <table class="ctable">
+          <tr>
+            <th>客戶</th><th>客戶料號</th><th>賣價</th><th>廠商</th><th>成本</th><th>比價</th>
+          </tr>`;
+
+    entries.forEach(r => {
+      const cpn     = r.cust_pn   || '';
+      const vendor  = r.vendor    || '';
+      const price   = r.sell_price !== '' ? Number(r.sell_price).toLocaleString() : '';
+      const cost    = r.cost      !== '' ? Number(r.cost).toLocaleString() : '';
+
+      html += `<tr>
+        <td>${r.cust_code} <span style="color:var(--text-muted)">${highlight(r.cust_name, allTerms)}</span></td>
+        <td class="${cpn ? '' : 'missing-cell'}">
+          ${cpn ? `<span class="mono">${highlight(cpn, allTerms)}</span>` : '<span class="empty">待補</span>'}
+        </td>
+        <td class="${price ? '' : 'missing-cell'}">
+          ${price ? `<span class="price">${price}</span>` : '<span class="empty">待補</span>'}
+        </td>
+        <td class="${vendor ? '' : 'missing-cell'}">
+          ${vendor ? highlight(vendor, allTerms) : '<span class="empty">待補</span>'}
+        </td>
+        <td class="${cost ? '' : 'missing-cell'}">
+          ${cost ? `<span class="price">${cost}</span>` : '<span class="empty">待補</span>'}
+        </td>
+        <td>${r.compare || '否'}</td>
+      </tr>`;
+    });
+
+    html += `</table></div>`;
+  }
+  area.innerHTML = html;
+}
+
+function clearSearch() {
+  document.getElementById('q1').value = '';
+  document.getElementById('q2').value = '';
+  document.getElementById('tag-row').innerHTML = '';
+  document.getElementById('result-area').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-state-title">輸入關鍵字開始搜尋</div>
+      <div class="empty-state-sub">可搜尋公司料號、客戶料號、品名或客戶名稱</div>
+    </div>`;
+}
+
+function clearQ(id) {
+  document.getElementById(id).value = '';
+  doSearch();
+}
+
+function openAdd(pre) {
+  ['f-ml','f-name','f-cc','f-cn','f-cpn','f-price','f-vendor','f-cost','f-note'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-cmp').value = '否';
+  if (pre) document.getElementById('f-ml').value = pre;
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+
+function saveRecord() {
+  const ml   = document.getElementById('f-ml').value.trim();
+  const name = document.getElementById('f-name').value.trim();
+  if (!ml || !name) { alert('公司料號和品名為必填'); return; }
+
+  const data = {
+    action:     'add',
+    ml_pn:      ml,
+    name:       name,
+    cust_code:  document.getElementById('f-cc').value.trim(),
+    cust_name:  document.getElementById('f-cn').value.trim(),
+    cust_pn:    document.getElementById('f-cpn').value.trim(),
+    sell_price: document.getElementById('f-price').value || '',
+    vendor:     document.getElementById('f-vendor').value.trim(),
+    cost:       document.getElementById('f-cost').value || '',
+    compare:    document.getElementById('f-cmp').value,
+    note:       document.getElementById('f-note').value.trim(),
+  };
+
+  callAPI({ action: 'add', ...data }, function(d) {
+    if (d && d.status === 'ok') {
+      closeModal();
+      showToast('已新增到 Google Sheets ✓');
+      doSearch();
+    } else {
+      alert('新增失敗，請再試一次');
+    }
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+document.getElementById('q1').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('q2').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+</script>
+</body>
+</html>
